@@ -100,7 +100,7 @@ let system={role:'system',content:'You are B.S AI, a powerful personal AI owned 
 let r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
 method:'POST',
 headers:{'Authorization':'Bearer '+process.env.GROQ_API_KEY,'Content-Type':'application/json'},
-body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[system,...messages],temperature:0.7})
+body:JSON.stringify({model:'openai/gpt-oss-120b',messages:[system,...messages],temperature:0.7})
 });
 let data=await r.json();
 if(data.error) return res.json({reply:'API Error: '+data.error.message});

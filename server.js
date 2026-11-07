@@ -10,11 +10,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Normal chat - text
 app.post('/chat', async (req, res) => {
   try {
     const { messages } = req.body;
-
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -28,7 +26,6 @@ app.post('/chat', async (req, res) => {
         max_tokens: 2000
       })
     });
-
     const data = await response.json();
     if (data.error) return res.json({ error: data.error.message });
     res.json({ reply: data.choices[0].message.content });
@@ -37,22 +34,45 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// Image generation - fixed for Image Refused error
+// Image generation - FIXED: Turbo model, no safe filter, strong cleaning
 app.post('/generate-image', async (req, res) => {
   try {
-    let { prompt } = req.body;
-    if (!prompt) prompt = 'beautiful illustration';
-
-    // Clean the prompt - remove trigger words Pollinations blocks
+    let prompt = req.body.prompt || '';
+    // Remove ALL the request words, keep only the subject
     prompt = prompt
-      .replace(/generate|create|draw|make a picture|make an image|make a diagram|please/gi, '')
-      .replace(/a tree diagram/gi, 'a beautiful tree diagram illustration, educational, clean, labeled')
+      .toLowerCase()
+      .replace(/can you/g, '')
+      .replace(/please/g, '')
+      .replace(/generate an image of/g, '')
+      .replace(/generate an image/g, '')
+      .replace(/generate image of/g, '')
+      .replace(/generate image/g, '')
+      .replace(/generate a/g, '')
+      .replace(/generate/g, '')
+      .replace(/create an image of/g, '')
+      .replace(/create image of/g, '')
+      .replace(/create a/g, '')
+      .replace(/create/g, '')
+      .replace(/draw a/g, '')
+      .replace(/draw/g, '')
+      .replace(/make a picture of/g, '')
+      .replace(/make an image of/g, '')
+      .replace(/make a diagram of/g, '')
+      .replace(/make a/g, '')
+      .replace(/make an/g, '')
+      .replace(/an image of/g, '')
+      .replace(/a picture of/g, '')
       .trim();
 
-    if (!prompt) prompt = 'beautiful illustration';
+    if (!prompt) prompt = 'beautiful landscape';
 
-    const cleanPrompt = encodeURIComponent('High quality illustration of ' + prompt + ', clean, detailed, vibrant');
-    const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&seed=${Date.now()}&model=flux&nologo=true&safe=true`;
+    // For diagrams, add a description that Turbo likes
+    if (prompt.includes('tree diagram')) {
+      prompt = 'educational tree diagram chart with branches, root, trunk, leaves, clear labels, white background, simple illustration';
+    }
+
+    const cleanPrompt = encodeURIComponent(prompt);
+    const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&seed=${Date.now()}&model=turbo&nologo=true`;
     res.json({ imageUrl });
   } catch (e) {
     res.json({ error: e.message });

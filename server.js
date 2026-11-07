@@ -10,7 +10,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Normal chat - text + image understanding
+// Normal chat - text
 app.post('/chat', async (req, res) => {
   try {
     const { messages } = req.body;
@@ -37,12 +37,22 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// Image generation - free, no key needed
+// Image generation - fixed for Image Refused error
 app.post('/generate-image', async (req, res) => {
   try {
-    const { prompt } = req.body;
-    const cleanPrompt = encodeURIComponent(prompt);
-    const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&seed=${Date.now()}&nologo=true`;
+    let { prompt } = req.body;
+    if (!prompt) prompt = 'beautiful illustration';
+
+    // Clean the prompt - remove trigger words Pollinations blocks
+    prompt = prompt
+      .replace(/generate|create|draw|make a picture|make an image|make a diagram|please/gi, '')
+      .replace(/a tree diagram/gi, 'a beautiful tree diagram illustration, educational, clean, labeled')
+      .trim();
+
+    if (!prompt) prompt = 'beautiful illustration';
+
+    const cleanPrompt = encodeURIComponent('High quality illustration of ' + prompt + ', clean, detailed, vibrant');
+    const imageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1024&height=1024&seed=${Date.now()}&model=flux&nologo=true&safe=true`;
     res.json({ imageUrl });
   } catch (e) {
     res.json({ error: e.message });

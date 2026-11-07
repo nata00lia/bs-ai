@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>B.S AI</title>
+<style>
+* { box-sizing: border-box; margin:0; padding:0; font-family: sans-serif; }
+body { display:flex; height:100vh; background:#0f0f0f; color:white; }
+#sidebar { width:260px; background:#171717; padding:12px; display:flex; flex-direction:column; overflow-y:auto; }
+#sidebar h2 { font-size:18px; margin-bottom:12px; }
+#newChatBtn { background:white; color:black; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight:bold; margin-bottom:12px; }
+.chat-item { padding:10px; border-radius:8px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+.chat-item:hover { background:#2a2a2a; }
+.chat-item.active { background:#2a2a2a; }
+.del { background:none; border:none; color:#888; cursor:pointer; font-size:16px; }
+#main { flex:1; display:flex; flex-direction:column; }
+#chat { flex:1; overflow-y:auto; padding:20px; max-width:800px; margin:0 auto; width:100%; }
+.msg { margin-bottom:16px; padding:14px; border-radius:12px; line-height:1.6; white-space:pre-wrap; position:relative; }
+.user { background:#2a2a2a; margin-left:40px; }
+.ai { background:#1e1e1e; margin-right:20px; }
+.msg pre { background:#000; padding:12px; border-radius:8px; overflow-x:auto; margin:10px 0; position:relative; }
+.copy-btn { position:absolute; top:8px; right:8px; background:#333; color:white; border:none; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:12px; }
+.copy-msg { background:#333; color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer; font-size:12px; margin-top:8px; }
+#inputArea { padding:16px; max-width:800px; margin:0 auto; width:100%; display:flex; gap:8px; align-items:center; }
+#input { flex:1; padding:12px; border-radius:10px; border:none; background:#2a2a2a; color:white; outline:none; }
+button.send { padding:12px 18px; border-radius:10px; border:none; background:white; color:black; font-weight:bold; cursor:pointer; }
+#imgBtn { background:#2a2a2a; color:white; border:none; padding:10px; border-radius:10px; cursor:pointer; }
+#preview { max-width:200px; border-radius:8px; display:none; margin:0 auto 10px; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <h2>B.S AI</h2>
+  <button id="newChatBtn">+ New Chat</button>
+  <div id="historyList"></div>
+</div>
+
+<div id="main">
+  <div id="chat"></div>
+  <img id="preview">
+  <div id="inputArea">
+    <input type="file" id="fileInput" accept="image/*" hidden>
+    <button id="imgBtn">📷</button>
+    <input id="input" placeholder="Ask B.S AI anything...">
+    <button class="send" onclick="send()">Send</button>
+  </div>
+</div>
+
+<script>
+let chats = JSON.parse(localStorage.getItem('bs_chats') || '[]');
+let currentId = localStorage.getItem('bs_current') || null;
+let currentImage = null;
+
+function save() {
+  localStorage.setItem('bs_chats', JSON.stringify(chats));
+  localStorage.setItem('bs_current', currentId);
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '';
+  chats.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'chat-item' + (c.id === currentId ? ' active' : '');
+    div.innerHTML = `<span>${c.title.slice(0,25)}</span><button class="del">🗑️</button>`;
+    div.querySelector('span').onclick = () => { currentId = c.id; loadChat(); renderHistory(); };
+    div.querySelector('.del').onclick = (e) => {
+      e.stopPropagation();
+      chats = chats.filter(x => x.id !== c.id);
+      if (currentId === c.id) { currentId = null; document.getElementById('chat').innerHTML=''; }
+      save();
+    };
+    list.appendChild(div);
+  });
+}
+
+function loadChat() {
+  const chat = chats.find(c => c.id === currentId);
+  const box = document.getElementById('chat');
+  box.innerHTML = '';
+  if (!chat) return;
+  chat.messages.forEach(m => addMsgToUI(m.role, m.content));
+}
+
+function newChat() {
+  currentId = Date.now().toString();
+  chats.unshift({ id: currentId, title: 'New Chat', messages: [] });
+  document.getElementById('chat').innerHTML = '';
+  save();
+}
+
+document.getElementById('newChatBtn').onclick = newChat;
+document.getElementById('imgBtn').onclick = () => document.getElementById('fileInput').click();
+
+document.getElementById('fileInput').onchange = (e) => {
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = () => {
+    currentImage = reader.result;
+    const p = document.getElementById('preview');
+    p.src = currentImage; p.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+};
+
+function formatText(text) {
+  // Code blocks with copy button
+  return text.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
+    const safe = code.replace(/</g,'&lt;');
+    return `<pre><button class="copy-btn" onclick="copyCode(this)">Copy</button><code>${safe}</code></pre>`;
+  });
+}
+
+function copyCode(btn) {
+  const code = btn.parentElement.querySelector('code').innerText;
+  navigator.clipboard.writeText(code);
+  btn.innerText = 'Copied!'; setTimeout(()=>btn.innerText='Copy', 1500);
+}
+
+function addMsgToUI(role, content) {
+  const box = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role==='user' ? 'user' : 'ai');
+  if (role === 'ai') {
+    div.innerHTML = formatText(content) + `<br><button class="copy-msg" onclick="copyMsg(this)">📋 Copy</button>`;
+  } else {
+    div.textContent = content;
+  }
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function copyMsg(btn) {
+  const text = btn.parentElement.innerText.replace('📋 Copy','').replace('Copy','');
+  navigator.clipboard.writeText(text);
+  btn.innerText = 'Copied!'; setTimeout(()=>btn.innerText='📋 Copy', 1500);
+}
+
+async function send() {
+  const input = document.getElementById('input');
+  const text = input.value.trim();
+  if (!text && !currentImage) return;
+  if (!currentId) newChat();
+  const chat = chats.find(c => c.id === currentId);
+  if (chat.messages.length === 0) chat.title = text.slice(0,30) || 'Image Chat';
+
+  chat.messages.push({ role:'user', content: text });
+  addMsgToUI('user', text);
+  input.value = '';
+
+  const thinking = document.createElement('div');
+  thinking.className = 'msg ai'; thinking.textContent = 'Thinking...';
+  document.getElementById('chat').appendChild(thinking);
+
+  const res = await fetch('/chat', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ messages: chat.messages, image: currentImage })
+  });
+  const data = await res.json();
+  thinking.remove();
+  chat.messages.push({ role:'assistant', content: data.reply });
+  addMsgToUI('assistant', data.reply);
+  currentImage = null;
+  document.getElementById('preview').style.display='none';
+  save();
+}
+
+document.getElementById('input').addEventListener('keydown', e => { if(e.key==='Enter') send(); });
+
+if (!currentId && chats.length===0) newChat();
+else { renderHistory(); loadChat(); }
+renderHistory();
+</script>
+</body>
+</html>
